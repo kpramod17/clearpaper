@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  background-color: #0a0a0a;
+  color: #e8e8e3;
+  min-height: 100vh;
+}
+
+/* Highlight terms */
+@layer utilities {
+  .highlight-term {
+    @apply cursor-pointer rounded-sm px-0.5 transition-colors duration-150;
+    color: #e8e8e3;
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.25);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
+  .highlight-term:hover {
+    text-decoration-color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+/* Side drawer animation */
+.drawer-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.drawer-panel {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Loading bar animation */
+.loading-bar {
+  height: 12px;
+  animation: loadingBar 1s ease-in-out infinite;
+}
+
+@keyframes loadingBar {
+  0%, 100% { height: 12px; opacity: 0.4; }
+  50% { height: 28px; opacity: 1; }
+}
+
+/* Skeleton pulse */
+.skeleton-pulse {
+  background: rgba(255, 255, 255, 0.06);
+  animation: skeletonPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+/* Loading status text fade */
+.loading-status {
+  animation: statusFade 2s ease-in-out infinite;
+}
+
+@keyframes statusFade {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Tab active indicator */
+.tab-active {
+  position: relative;
+}
+
+.tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #e8e8e3;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
