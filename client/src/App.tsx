@@ -6,16 +6,70 @@ import DeepDiveDrawer from "./components/DeepDiveDrawer";
 import { Plus } from "lucide-react";
 import { colors } from "./lib/design";
 
+async function readSSEStream(
+  response: Response,
+  onStatus: (message: string) => void,
+  onResult: (data: SimplifyResponse) => void,
+  onError: (error: string) => void,
+): Promise<void> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE events are separated by double newlines
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+
+      let eventType = "message";
+      let data = "";
+
+      for (const line of trimmed.split("\n")) {
+        if (line.startsWith("event: ")) {
+          eventType = line.slice(7);
+        } else if (line.startsWith("data: ")) {
+          data = line.slice(6);
+        }
+      }
+
+      if (!data) continue;
+
+      if (eventType === "status") {
+        const parsed = JSON.parse(data);
+        onStatus(parsed.message);
+      } else if (eventType === "result") {
+        const parsed = JSON.parse(data);
+        onResult(parsed);
+      } else if (eventType === "error") {
+        const parsed = JSON.parse(data);
+        onError(parsed.error);
+      }
+      // heartbeat events are silently ignored
+    }
+  }
+}
+
 export default function App() {
   const [result, setResult] = useState<SimplifyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("");
 
   async function handleSimplifyUrl(url: string) {
     setLoading(true);
     setError(null);
     setResult(null);
+    setStatusMessage("Connecting...");
 
     try {
       const res = await fetch("/api/simplify", {
@@ -24,17 +78,22 @@ export default function App() {
         body: JSON.stringify({ url }),
       });
 
+      // Validation errors return normal JSON (before SSE starts)
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to simplify paper");
       }
 
-      const data: SimplifyResponse = await res.json();
-      setResult(data);
+      await readSSEStream(
+        res,
+        (message) => setStatusMessage(message),
+        (data) => { setResult(data); setLoading(false); setStatusMessage(""); },
+        (errorMsg) => { throw new Error(errorMsg); },
+      );
     } catch (err: any) {
       setError(err.message || "Something went wrong");
-    } finally {
       setLoading(false);
+      setStatusMessage("");
     }
   }
 
@@ -42,6 +101,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setStatusMessage("Uploading PDF...");
 
     try {
       const formData = new FormData();
@@ -50,7 +110,6 @@ export default function App() {
       const res = await fetch("/api/simplify-pdf", {
         method: "POST",
         body: formData,
-        // Do NOT set Content-Type — browser sets it with multipart boundary
       });
 
       if (!res.ok) {
@@ -58,12 +117,16 @@ export default function App() {
         throw new Error(data.error || "Failed to simplify PDF");
       }
 
-      const data: SimplifyResponse = await res.json();
-      setResult(data);
+      await readSSEStream(
+        res,
+        (message) => setStatusMessage(message),
+        (data) => { setResult(data); setLoading(false); setStatusMessage(""); },
+        (errorMsg) => { throw new Error(errorMsg); },
+      );
     } catch (err: any) {
       setError(err.message || "Something went wrong");
-    } finally {
       setLoading(false);
+      setStatusMessage("");
     }
   }
 
@@ -71,6 +134,7 @@ export default function App() {
     setResult(null);
     setError(null);
     setSelectedTerm(null);
+    setStatusMessage("");
   }
 
   const selectedDeepDive = result?.deepDives.find(
@@ -128,13 +192,13 @@ export default function App() {
               ))}
             </div>
 
-            {/* Status text */}
+            {/* Status text — updates in real-time from SSE */}
             <div className="text-center">
               <p className="text-sm font-medium text-[#e8e8e3] mb-2">
                 Analyzing paper
               </p>
               <p className="text-xs text-[#555] loading-status">
-                Extracting content and breaking down the research...
+                {statusMessage || "Extracting content and breaking down the research..."}
               </p>
             </div>
 
